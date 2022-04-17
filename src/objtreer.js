@@ -196,7 +196,12 @@ function bfsCopyTree(maxDepth, objIn, finder, objName='') {
 
           //console.log('ln230 forMappings'); printObjIdTree(2,forMappings)
           Object.getOwnPropertyNames(qelement.toObj).forEach(function (key) {
-            let val = qelement.toObj[key];
+            let val = '[field-not-accessible]';
+            try {
+                val = qelement.toObj[key];
+            } catch (exc) {
+                // This can happen exc.message == TypeError: 'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them
+            }
             addObjToQueue(newPathname, newObj, key, val, qelement.depth+1);
           })
           //console.log('ln236 forMappings'); printObjIdTree(2,forMappings)

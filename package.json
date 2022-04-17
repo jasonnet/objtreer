@@ -4,6 +4,7 @@
   "description": "library for processing of object trees for stringification",
   "main": "dist/cjs/objtreer.js",
   "module": "dist/mjs/objtreer.js",
+  "type": "module",
   "exports": {
     ".": {
       "import": "./dist/mjs/objtreer.js",
