@@ -2,12 +2,12 @@
   "name": "objtreer",
   "version": "0.1.0",
   "description": "library for processing of object trees for stringification",
-  "main": "dist/cjs/index.js",
-  "module": "dist/mjs/index.js",
+  "main": "dist/cjs/objtreer.js",
+  "module": "dist/mjs/objtreer.js",
   "exports": {
     ".": {
-      "import": "./dist/mjs/index.js",
-      "require": "./dist/cjs/index.js"
+      "import": "./dist/mjs/objtreer.js",
+      "require": "./dist/cjs/objtreer.js"
     }
   },
   "scripts": {
