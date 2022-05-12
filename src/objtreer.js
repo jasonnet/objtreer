@@ -194,8 +194,10 @@ function bfsCopyTree(maxDepth, objIn, finder, objName='') {
           const newPathname = qelement.fromPath+((qelement.fromObjDst instanceof Array)?'['+qelement.accessName+']':'.'+qelement.accessName);
           forMappings2Path.set(qelement.toObj,newPathname);
 
+          let propnames = Object.getOwnPropertyNames(qelement.toObj);
+          if ((propnames.length===0) && qelement.toObj.toJSON) propnames = Object.getOwnPropertyNames(qelement.toObj.toJSON());  // this can be handy for object like an object created by WebRTC's peer.createOffer().  All of it's properties are invisible to the Object.getOwnPropertyNames function.
           //console.log('ln230 forMappings'); printObjIdTree(2,forMappings)
-          Object.getOwnPropertyNames(qelement.toObj).forEach(function (key) {
+          propnames.forEach(function (key) {
             let val = '[field-not-accessible]';
             try {
                 val = qelement.toObj[key];
@@ -238,5 +240,5 @@ function stringify(objIn, maxDepth=3) {
   return JSON.stringify(safeObj);
 }
 
-export             {stringify,logLocationInObjectTree,bfsCopyTree};  // for .mjs file
-//module.exports = {stringify,logLocationInObjectTree,bfsCopyTree};   // for .cjs file
+export                     {stringify,logLocationInObjectTree,bfsCopyTree};  //spp:mjs
+//spp:cjs module.exports = {stringify,logLocationInObjectTree,bfsCopyTree};
