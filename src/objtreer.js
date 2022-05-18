@@ -29,6 +29,28 @@ was collected from the dev environment elastic search/kibana:
 
 
 /**
+ * Returns even the inherited proeprty names in addition to the non-enumerable ones.
+ * 
+ * @param {object} obj 
+ * @returns 
+ */
+function getNearlyAllPropertyNames(obj) {
+    var names = [];
+    for (; obj != null; obj = Object.getPrototypeOf(obj)) {
+        var op = Object.getOwnPropertyNames(obj);
+        for (var i=0; i<op.length; i++)
+            if (['__lookupGetter__','__lookupSetter__','propertyIsEnumerable','hasOwnProperty','__defineSetter__','__defineGetter__','isPrototypeOf','constructor'].includes(op[i])) {
+              // skip these that everything has
+            } else if (['toString','valueOf','toLocaleString'].includes(op[i])) {
+              // skip these commonly seen functions since listing their existance is of low value to us
+            } else if (names.indexOf(op[i]) == -1) {
+              names.push(op[i]);
+            }
+    }
+    return names;
+}
+
+/**
  * Return a copy of the specified object tree that is suitable for being called
  * by JSON.stringify().  All reference loops will be removed.  The tree will not be 
  * copied below a certain depth and instead that subtree will be expressed with 
@@ -61,11 +83,28 @@ was collected from the dev environment elastic search/kibana:
  *      can be rendered with JSON.stringify to produce a reasonable rendering even
  *      in the face of redundant objects.
  */
-function bfsCopyTree(maxDepth, objIn, finder, objName='') {
+function bfsCopyTree(maxDepth, objIn, finder, objName='', options) {
   //console.log('objIn');  printObjIdTree(8,objIn);
   let needle = finder?.needle;
   if (needle) {
     finder.foundPaths = [];
+  }
+  let excludeMap;
+  let includeMap;
+  if (options) {
+    if (options.include && options.exclude) {
+      throw new Error('include and exclude both specified')
+    } else if (options.exclude) {
+      excludeMap = [];
+      for (let key of options.exclude) {
+        excludeMap[key] = true;   // assumption: the key is a string
+      }
+    } else {
+      includeMap = [];
+      for (let key of options.include) {
+        includeMap[key] = true;   // assumption: the key is a string
+      }
+    }
   }
   const queue = [];
   //maxDepth = 9;   don't use this line.  Instead code that calls this module should use withMaxDepth(9)
@@ -195,6 +234,27 @@ function bfsCopyTree(maxDepth, objIn, finder, objName='') {
           forMappings2Path.set(qelement.toObj,newPathname);
 
           let propnames = Object.getOwnPropertyNames(qelement.toObj);
+          if (qelement.depth===0) {
+            // at top level
+            if (includeMap || excludeMap) {
+              propnames = getNearlyAllPropertyNames(qelement.toObj);  // get prototype properties as well.  This can be handy for extracting .data from event objects.  Etc.
+              if (includeMap) {
+                propnames = propnames.filter((propname) => {
+                  if (includeMap[propname]) return true;
+                  return false;
+                });
+              } else {
+                const excludeFunctions = excludeMap['all-functions']
+                propnames = propnames.filter((propname) => {
+                  if (excludeMap[propname]) return false;
+                  if (excludeFunctions && ('function'===typeof qelement.toObj[propname])) return false;
+                  return true;
+                });  // an interesting feature/bug of this use of exclude map is that any properties that the engine added by default to that map (like __proto__) is also removed
+              }
+            } else {
+              // just use the default properties.
+            }
+          }
           if ((propnames.length===0) && qelement.toObj.toJSON) propnames = Object.getOwnPropertyNames(qelement.toObj.toJSON());  // this can be handy for object like an object created by WebRTC's peer.createOffer().  All of it's properties are invisible to the Object.getOwnPropertyNames function.
           //console.log('ln230 forMappings'); printObjIdTree(2,forMappings)
           propnames.forEach(function (key) {
@@ -240,5 +300,31 @@ function stringify(objIn, maxDepth=3) {
   return JSON.stringify(safeObj);
 }
 
-export                     {stringify,logLocationInObjectTree,bfsCopyTree};  //spp:mjs
-//spp:cjs module.exports = {stringify,logLocationInObjectTree,bfsCopyTree};
+
+/**
+ * Shorter form of bfsCopyTree provided for convenience.
+ */
+function copyTree(obj,maxDepth=3) {
+  return bfsCopyTree(maxDepth, obj)
+}
+
+/**
+ * Shorter form of bfsCopyTree provided for convenience.  At the top level
+ * it only includes the listed properties.
+ */
+function copyIncluding(obj,propNames,maxDepth=3) {
+  return bfsCopyTree(maxDepth, obj, undefined, undefined, {include:propNames})
+}
+
+/**
+ * Shorter form of bfsCopyTree provided for convenience.  At the top level
+ * it only includes all properties except the specified properties.   `all-functions`
+ * is a special property name that indicates that all properties whose value is a
+ * function should be excluded.  
+ */
+ function copyExcluding(obj,propNames,maxDepth=3) {
+  return bfsCopyTree(maxDepth, obj, undefined, undefined, {include:propNames})
+}
+
+export                     {stringify,logLocationInObjectTree,bfsCopyTree,getNearlyAllPropertyNames,copyIncluding,copyExcluding,copyTree};  //spp:mjs
+//spp:cjs module.exports = {stringify,logLocationInObjectTree,bfsCopyTree,getNearlyAllPropertyNames,copyIncluding,copyExcluding,copyTree};
