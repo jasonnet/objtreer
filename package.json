@@ -1,6 +1,6 @@
 {
-  "name": "objtreer",
-  "version": "0.1.0",
+  "name": "@XioResearchInterGalactic/objtreer",
+  "version": "0.1.7",
   "description": "library for processing of object trees for stringification",
   "main": "dist/cjs/objtreer.js",
   "module": "dist/mjs/objtreer.js",
@@ -15,10 +15,10 @@
     "build": "rm -fr dist/* && simplepp --from src --to dist/cjs +cjs -mjs --package-type commonjs  &&  simplepp --from src --to dist/mjs -cjs +mjs --package-type module ",
     "test": "mocha"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/jason-crawford-xio/objtreer.git"
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
   },
+  "repository": "https://github.com/XioResearchInterGalactic/objtreer.git",
   "keywords": [
     "object",
     "stringification",
@@ -27,13 +27,11 @@
   "author": "Jason Crawford <jason.crawford@merlyn.org>",
   "license": "UNLICENSED",
   "bugs": {
-    "url": "https://github.com/jason-crawford-xio/objtreer/issues"
+    "url": "https://github.com/XioResearchInterGalactic/objtreer/issues"
   },
   "devDependencies": {
-    "simplepp": "../simplepp/",
+    "@XioResearchInterGalactic/simplepp": "^0.2.x",
     "mocha": "^9.2.0"
   },
-  "dependencies": {
-  },
-  "homepage": "https://github.com/jason-crawford-xio/objtreer#readme"
+  "homepage": "https://github.com/XioResearchInterGalactic/objtreer#readme"
 }

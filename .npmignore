@@ -1,0 +1,2 @@
+# We include this .npmignore file so that npm publish includes all of our dist/ tree despite .gitignore suggesting that it should be ignored.
+#   This is not really a problem for a simple  `npm publish`,  but we were not seeing all the dist/ tree content if using the  `np` node command.

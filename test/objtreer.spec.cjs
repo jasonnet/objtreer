@@ -1,4 +1,4 @@
-let assert = require('assert/strict');
+let assert = require('assert').strict;
 let {stringify} = require('../dist/cjs/objtreer.js');
 //const {lastCharsOf} = require('./lastchars.cjs')
 

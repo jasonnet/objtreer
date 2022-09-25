@@ -39,7 +39,8 @@ function getNearlyAllPropertyNames(obj) {
     for (; obj != null; obj = Object.getPrototypeOf(obj)) {
         var op = Object.getOwnPropertyNames(obj);
         for (var i=0; i<op.length; i++)
-            if (['__lookupGetter__','__lookupSetter__','propertyIsEnumerable','hasOwnProperty','__defineSetter__','__defineGetter__','isPrototypeOf','constructor'].includes(op[i])) {
+            // we include __proto__ here because users never really want to see it expanded and because without it the logic of the bfsCopyTree method below runs in to trouble recursing in to the __proto__.  That problem is related to "Invalid invocation". https://stackoverflow.com/questions/44361981/addeventlistener-drop-error-uncaught-typeerror-illegal-invocation
+            if (['__proto__', '__lookupGetter__','__lookupSetter__','propertyIsEnumerable','hasOwnProperty','__defineSetter__','__defineGetter__','isPrototypeOf','constructor'].includes(op[i])) {
               // skip these that everything has
             } else if (['toString','valueOf','toLocaleString'].includes(op[i])) {
               // skip these commonly seen functions since listing their existance is of low value to us
@@ -94,16 +95,18 @@ function bfsCopyTree(maxDepth, objIn, finder, objName='', options) {
   if (options) {
     if (options.include && options.exclude) {
       throw new Error('include and exclude both specified')
+    } else if (options.include) {
+      includeMap = [];
+      for (let key of options.include) {
+        includeMap[key] = true;   // assumption: the key is a string
+      }
     } else if (options.exclude) {
       excludeMap = [];
       for (let key of options.exclude) {
         excludeMap[key] = true;   // assumption: the key is a string
       }
     } else {
-      includeMap = [];
-      for (let key of options.include) {
-        includeMap[key] = true;   // assumption: the key is a string
-      }
+      // default case
     }
   }
   const queue = [];
@@ -164,8 +167,12 @@ function bfsCopyTree(maxDepth, objIn, finder, objName='', options) {
         } catch (exc) {
           count3 = 'w';
         }
-        let newObj = '[Function: '+objIn.name+' propnames:'+names3+']';
-        qelement.fromObjDst[qelement.accessName] = newObj;
+        let newObj = '[Function'+(objIn.name ? ':'+objIn.name : '');
+        if (options && options.allFunctionProps) {
+          newObj += ' propnames:'+names3;
+        }
+        newObj += ']'
+        qelement.fromObjDst[qelement.accessName] = newObj;  
       } catch (exc) {
         // TODO: is this dead code?
         console.warn('enountered an exception processing a function pointer:', exc);
@@ -244,15 +251,33 @@ function bfsCopyTree(maxDepth, objIn, finder, objName='', options) {
                   return false;
                 });
               } else {
-                const excludeFunctions = excludeMap['all-functions']
                 propnames = propnames.filter((propname) => {
                   if (excludeMap[propname]) return false;
-                  if (excludeFunctions && ('function'===typeof qelement.toObj[propname])) return false;
                   return true;
-                });  // an interesting feature/bug of this use of exclude map is that any properties that the engine added by default to that map (like __proto__) is also removed
+                });
+                // Previously we had code here for checking excludeMap[`all-functions`], but we've now moved it lower in this method so that it also is respected at levels >0
               }
             } else {
               // just use the default properties.
+            }
+          }
+          { // we're going respect `all-functions` at all levels of the structure, not just the top
+            const excludeFunctions = excludeMap && excludeMap['all-functions']
+            if (excludeFunctions) {
+              propnames = propnames.filter((propname) => {
+                let val;
+                try {
+                  val = qelement.toObj[propname];  
+                  if ('function'===typeof val) return false;
+                } catch (exc) {
+                  // We might encounter "Invalid invocation" exceptions.  We think we've eliminated that possibility, but if not, read the following example: https://stackoverflow.com/questions/44361981/addeventlistener-drop-error-uncaught-typeerror-illegal-invocation
+                  // This can happen exc.message == TypeError: 'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them
+                  console.warn('inaccessible property: ',propname);
+                  // TODO: we return false in this case.  Consider returning true so that the code that follows this renders with a special value indicating that it's inaccessible
+                  return false;
+                }
+                return true;
+              });  // an interesting feature/bug of this use of exclude map is that any properties that the engine added by default to that map (like __proto__) is also removed  
             }
           }
           if ((propnames.length===0) && qelement.toObj.toJSON) propnames = Object.getOwnPropertyNames(qelement.toObj.toJSON());  // this can be handy for object like an object created by WebRTC's peer.createOffer().  All of it's properties are invisible to the Object.getOwnPropertyNames function.
@@ -262,6 +287,7 @@ function bfsCopyTree(maxDepth, objIn, finder, objName='', options) {
             try {
                 val = qelement.toObj[key];
             } catch (exc) {
+                // We might encounter "Invalid invocation" exceptions.  We think we've eliminated that possibility, but if not, read the following example: https://stackoverflow.com/questions/44361981/addeventlistener-drop-error-uncaught-typeerror-illegal-invocation
                 // This can happen exc.message == TypeError: 'caller', 'callee', and 'arguments' properties may not be accessed on strict mode functions or the arguments objects for calls to them
             }
             addObjToQueue(newPathname, newObj, key, val, qelement.depth+1);
@@ -272,6 +298,8 @@ function bfsCopyTree(maxDepth, objIn, finder, objName='', options) {
         //console.log('newObj');  printObjIdTree(8,newObj);
         qelement.fromObjDst[qelement.accessName] = newObj;
       }
+    } else if (objType === 'symbol') {
+      qelement.fromObjDst[qelement.accessName] = 'Symbol()';
     } else {
       console.warn('objType warn',objType)  
     }  
@@ -322,9 +350,35 @@ function copyIncluding(obj,propNames,maxDepth=3) {
  * is a special property name that indicates that all properties whose value is a
  * function should be excluded.  
  */
- function copyExcluding(obj,propNames,maxDepth=3) {
-  return bfsCopyTree(maxDepth, obj, undefined, undefined, {include:propNames})
+function copyExcluding(obj,propNames,maxDepth=3) {
+  return bfsCopyTree(maxDepth, obj, undefined, undefined, {exclude:propNames})
 }
 
-export                     {stringify,logLocationInObjectTree,bfsCopyTree,getNearlyAllPropertyNames,copyIncluding,copyExcluding,copyTree};  //spp:mjs
-//spp:cjs module.exports = {stringify,logLocationInObjectTree,bfsCopyTree,getNearlyAllPropertyNames,copyIncluding,copyExcluding,copyTree};
+/**
+ * Returns an object that resembles the provided
+ * object, but has fewer properties and the properties
+ * will be enumerable own-properties rather than 
+ * properties inherited from the prototype.  This
+ * returned object is easier to log.
+ * 
+ * Background: The objects of class Event https://developer.mozilla.org/en-US/docs/Web/API/Event
+ * can be awkward to log.   This method provides
+ * a way for the caller to create a simplified
+ * object with most of the same info, but 
+ * structured in a way that is easier to log.
+ * 
+ * @param {object} event 
+ */
+function copyEventForNeaterLogging(event) {
+  let newObject = {};
+  newObject.type = event.type;
+  newObject.data = event.data;
+  newObject.detail = event.detail;
+  if (event.currentTarget) newObject.currentTarget = {};
+  if (event.currentTarget?.connectionState) newObject.currentTarget.connectionState = event.currentTarget.connectionState;
+  return newObject;
+}
+
+
+export                     {stringify,logLocationInObjectTree,bfsCopyTree,getNearlyAllPropertyNames,copyIncluding,copyExcluding,copyTree,copyEventForNeaterLogging};  //spp:mjs
+//spp:cjs module.exports = {stringify,logLocationInObjectTree,bfsCopyTree,getNearlyAllPropertyNames,copyIncluding,copyExcluding,copyTree,copyEventForNeaterLogging};

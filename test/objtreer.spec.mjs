@@ -1,4 +1,4 @@
-import assert from 'assert/strict';
+import {strict as assert} from 'assert';
 import {stringify} from '../dist/mjs/objtreer.js';
 //const {lastCharsOf} = require('./lastchars.cjs')
 
